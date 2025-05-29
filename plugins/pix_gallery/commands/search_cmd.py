@@ -481,12 +481,12 @@ async def _(bot: Bot, event: Event, idx_query: Query[int] = Query("img_idx")):
         result_text = (
             f"title: {pix_model_to_show.title}\n"
             f"author: {pix_model_to_show.author}\n"
-            f"pid: {pix_model_to_show.pid}-{pix_model_to_show.img_p}\n"
-            f"uid: {pix_model_to_show.uid}\n"
             f"nsfw: {pix_model_to_show.nsfw_tag}\n"
             f"是否AI: {'是' if pix_model_to_show.is_ai else '否'}\n"
             f"收藏数: {pix_model_to_show.total_bookmarks}\n"
-            f"tags: {tags_display}"
+            f"tags: {tags_display}\n\n"
+            f"UID链接: https://www.pixiv.net/users/{pix_model_to_show.uid}\n"
+            f"Pixiv链接: https://www.pixiv.net/artworks/{pix_model_to_show.pid}"
         )
         await MessageUtils.build_message(result_text).finish(reply_to=True)
 

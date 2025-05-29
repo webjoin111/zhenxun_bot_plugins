@@ -92,17 +92,17 @@ _pix_blacklist_manager = on_alconna(
     Alconna(
         ".pix黑名单",
         Subcommand(
-            "add",
+            "add|添加",
             Args["bl_add_type", ["u", "p", "k"]]["bl_add_content", str][
                 "bl_add_reason?", str
             ],
         ),
         Subcommand(
-            "del",
-            Args["bl_del_type?", ["u", "p", "k"]]["bl_del_content", str],
+            "del|删除|移除",
+            Args["bl_del_content", str]["bl_del_type?", ["u", "p", "k"]],
         ),
         Subcommand(
-            "view",
+            "view|查看",
             Args["bl_view_type?", ["u", "p", "k"]],
         ),
     ),
@@ -435,8 +435,8 @@ async def handle_blacklist_add(
 async def handle_blacklist_remove(
     session: Uninfo,
     arparma: Arparma,
-    bl_del_type: Query[str] = Query("del.bl_del_type"),
     bl_del_content: Query[str] = Query("del.bl_del_content"),
+    bl_del_type: Query[str] = Query("del.bl_del_type"),
 ):
     """黑名单移除命令处理 (子命令)"""
     if not bl_del_content.available:
@@ -444,18 +444,26 @@ async def handle_blacklist_remove(
         return
 
     content_val = bl_del_content.result
-    kw_type = None
 
-    if bl_del_type.available:
-        type_val = bl_del_type.result
-        if type_val == "u":
-            kw_type = KwType.UID
-        elif type_val == "p":
-            kw_type = KwType.PID
-        elif type_val == "k":
-            kw_type = KwType.KEYWORD
+    # 判断是否为纯数字ID
+    if content_val.isdigit():
+        # 通过ID删除
+        blacklist_id = int(content_val)
+        result_msg = await blacklist_service.remove_blacklist_by_id(blacklist_id)
+    else:
+        # 通过内容删除
+        kw_type = None
+        if bl_del_type.available:
+            type_val = bl_del_type.result
+            if type_val == "u":
+                kw_type = KwType.UID
+            elif type_val == "p":
+                kw_type = KwType.PID
+            elif type_val == "k":
+                kw_type = KwType.KEYWORD
 
-    result_msg = await blacklist_service.remove_blacklist(content_val, kw_type)
+        result_msg = await blacklist_service.remove_blacklist(content_val, kw_type)
+
     await MessageUtils.build_message(result_msg).send()
     logger.info(f"PIX 黑名单移除: {result_msg}", arparma.header_result, session=session)
 
@@ -532,6 +540,8 @@ async def _(
         ["普通", stats["normal"]],
         ["R18", stats["r18"]],
         ["AI", stats["ai"]],
+        ["普通AI", stats["normal_ai"]],
+        ["R18 AI", stats["r18_ai"]],
     ]
 
     title = "PIX图库统计"

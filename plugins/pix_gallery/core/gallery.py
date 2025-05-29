@@ -79,8 +79,17 @@ class GalleryManager:
         normal = await query.filter(nsfw_tag__not=2).count()
         r18 = await query.filter(nsfw_tag=2).count()
         ai = await query.filter(is_ai=True).count()
+        normal_ai = await query.filter(nsfw_tag__not=2, is_ai=True).count()
+        r18_ai = await query.filter(nsfw_tag=2, is_ai=True).count()
 
-        return {"total": total, "normal": normal, "r18": r18, "ai": ai}
+        return {
+            "total": total,
+            "normal": normal,
+            "r18": r18,
+            "ai": ai,
+            "normal_ai": normal_ai,
+            "r18_ai": r18_ai
+        }
 
     @classmethod
     async def add_keyword(cls, user_id: str, content: str, kw_type: KwType) -> str:

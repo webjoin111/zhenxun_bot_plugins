@@ -69,6 +69,28 @@ class BlacklistService:
         return f"已从黑名单中移除 {content}，共 {count} 条记录"
 
     @classmethod
+    async def remove_blacklist_by_id(cls, blacklist_id: int) -> str:
+        """通过ID移除黑名单
+
+        参数:
+            blacklist_id: 黑名单记录ID
+
+        返回:
+            str: 操作结果消息
+        """
+        blacklist_item = await PixivContentManagement.filter(
+            id=blacklist_id, is_blacklist=True
+        ).first()
+
+        if not blacklist_item:
+            return f"未找到ID为 {blacklist_id} 的黑名单记录"
+
+        content = blacklist_item.content
+        content_type = blacklist_item.content_type.value
+        await blacklist_item.delete()
+        return f"已从黑名单中移除 {content_type} 类型的 {content} (ID: {blacklist_id})"
+
+    @classmethod
     async def get_blacklist(cls, bl_type: Optional[KwType] = None) -> List[Dict[str, Any]]:
         """获取黑名单列表
 
