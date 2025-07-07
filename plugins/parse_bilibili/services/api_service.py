@@ -4,14 +4,10 @@ from typing import Dict, Any, Optional, List
 import aiohttp
 from bilibili_api import exceptions as BiliExceptions
 from bilibili_api import live, video, article, user
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from zhenxun.services.log import logger
+from zhenxun.utils.decorator.retry import Retry
+from zhenxun.utils.http_utils import AsyncHttpx
 
 from ..config import get_credential
 from ..model import (
@@ -25,7 +21,7 @@ from ..model import (
     SeasonStat,
     ArticleInfo,
 )
-from .network_service import NetworkService
+
 from ..utils.exceptions import (
     BilibiliRequestError,
     BilibiliResponseError,
@@ -42,6 +38,7 @@ RETRYABLE_EXCEPTIONS = (
     asyncio.TimeoutError,
     RateLimitError,
 )
+
 
 
 class BilibiliApiService:
@@ -171,6 +168,10 @@ class BilibiliApiService:
             logger.debug(f"视频信息获取成功: {video_model.title}", "B站解析")
             return video_model
 
+        # 新增的异常捕获块，用于处理无效的视频ID
+        except BiliExceptions.ArgsException as e:
+            logger.error(f"Bilibili-api参数错误 ({vid}): {e}", "B站解析")
+            raise UrlParseError(f"视频ID格式错误: {vid}", cause=e, context={"vid": vid, "url": parsed_url})
         except ResourceNotFoundError:
             raise ResourceNotFoundError(f"视频未找到: {vid}", context={"vid": vid, "url": parsed_url})
         except BiliExceptions.ApiException as e:
@@ -291,11 +292,7 @@ class BilibiliApiService:
             )
 
     @staticmethod
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=5),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-    )
+    @Retry.api(exception=RETRYABLE_EXCEPTIONS)
     async def get_article_info(cv_id: str, parsed_url: str) -> ArticleInfo:
         """获取专栏文章信息"""
         logger.debug(f"获取专栏信息: {cv_id}", "B站解析")
@@ -354,11 +351,7 @@ class BilibiliApiService:
             raise BilibiliResponseError(f"获取专栏信息意外错误: {e}", cause=e, context=context)
 
     @staticmethod
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=5),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-    )
+    @Retry.api(exception=RETRYABLE_EXCEPTIONS)
     async def get_user_info(uid: int, parsed_url: str) -> UserInfo:
         """获取用户空间信息"""
         logger.debug(f"获取用户信息: {uid}", "B站解析")
@@ -518,11 +511,7 @@ class BilibiliApiService:
         return season_model
 
     @staticmethod
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=2, max=20),
-        retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-    )
+    @Retry.api(exception=RETRYABLE_EXCEPTIONS)
     async def get_bangumi_info(
         parsed_url: str, season_id: Optional[int] = None, ep_id: Optional[int] = None
     ) -> SeasonInfo:
@@ -543,7 +532,16 @@ class BilibiliApiService:
 
             season_url = f"https://api.bilibili.com/pgc/view/web/season?{api_param}"
             logger.debug(f"请求番剧API: {season_url}", "B站解析")
-            season_resp = await NetworkService.get_json(season_url)
+
+            # 使用 AsyncHttpx 替代 NetworkService.get_json
+            from ..utils.headers import get_bilibili_headers
+            cred = get_credential()
+            headers = get_bilibili_headers()
+            cookies = cred.get_cookies() if cred else None
+
+            response = await AsyncHttpx.get(season_url, headers=headers, cookies=cookies)
+            response.raise_for_status()  # 检查HTTP状态码
+            season_resp = response.json()
 
             if not isinstance(season_resp, dict):
                 logger.error(f"番剧API响应不是字典类型: {type(season_resp)}", "B站解析")
