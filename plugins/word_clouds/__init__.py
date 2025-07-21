@@ -1,13 +1,10 @@
-from nonebot import require
-
-require("nonebot_plugin_apscheduler")
 
 from nonebot.plugin import PluginMetadata
 
 from zhenxun.configs.utils import Command, PluginExtraData, RegisterConfig
 from zhenxun.utils.enum import PluginType
 from typing import List
-from . import command
+from . import command  # noqa: F401
 
 __plugin_meta__ = PluginMetadata(
     name="词云",
